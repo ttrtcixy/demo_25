@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	_ "fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -29,39 +28,55 @@ type partnerTable struct {
 }
 
 func NewApp() *App {
-	return &App{db: storage.NewDB(),
+	return &App{
+		db:  storage.NewDB(),
 		app: app.New(),
 	}
 }
 
 func (a *App) Run() {
+	iconResource, err := fyne.LoadResourceFromPath("./cmd/icon.png")
+
 	a.w = a.app.NewWindow("Управление Партнерами")
-	fmt.Println(a)
+	a.w.SetIcon(iconResource)
+
 	partnersTable, err := a.PartnersTable()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
+
+	// Проверка на отсутствие партнеров
+	if partnersTable.partners == nil || len(*partnersTable.partners) == 0 {
+		dialog.ShowInformation("Нет данных", "Партнеры не найдены. Добавьте нового партнера.", a.w)
+	}
+
 	scrollContainer := container.NewHScroll(partnersTable.table)
 	scrollContainer.SetMinSize(fyne.NewSize(800, 400))
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Партнеры", container.NewBorder(nil, container.NewHBox(partnersTable.addButton, partnersTable.deleteButton), nil, nil, scrollContainer)))
+		container.NewTabItem("Партнеры", container.NewBorder(nil, container.NewHBox(partnersTable.addButton, partnersTable.deleteButton), nil, nil, scrollContainer)),
+	)
 	a.w.SetContent(tabs)
 	a.w.Resize(fyne.NewSize(1000, 600))
 	a.w.ShowAndRun()
 }
 
 func (a *App) PartnersTable() (*partnerTable, error) {
-	t := partnerTable{}
+	t := &partnerTable{}
 	var err error
 
 	t.partners, err = a.db.GetPartners()
 	if err != nil {
-		return nil, nil
+		return t, err
+	}
+
+	// Если партнеров нет, инициализируем пустой список
+	if t.partners == nil {
+		t.partners = &models.Partners{}
 	}
 
 	table := widget.NewTable(
 		func() (int, int) {
-			return len(*t.partners) + 1, 6 // +1 для заголовков, 8 колонок (пустой столбец + 7 полей)
+			return len(*t.partners) + 1, 6 // +1 для заголовков, 6 колонок
 		},
 		func() fyne.CanvasObject {
 			return container.NewHScroll(widget.NewLabel("template"))
@@ -84,23 +99,33 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 					label.SetText("Телефон")
 				case 5:
 					label.SetText("Рейтинг")
+				case 6:
+					label.SetText("Почта")
+				case 7:
+					label.SetText("Юр. Адрес")
 				}
 			} else {
 				// Данные партнеров
-				p := (*t.partners)[i.Row-1]
-				switch i.Col {
-				case 0:
-					label.SetText("")
-				case 1:
-					label.SetText(p.CompanyName)
-				case 2:
-					label.SetText(p.PartnerType)
-				case 3:
-					label.SetText(p.Director)
-				case 4:
-					label.SetText(p.Phone)
-				case 5:
-					label.SetText(fmt.Sprintf("%d", p.Rating))
+				if len(*t.partners) > 0 && i.Row-1 < len(*t.partners) {
+					p := (*t.partners)[i.Row-1]
+					switch i.Col {
+					case 0:
+						label.SetText("")
+					case 1:
+						label.SetText(p.CompanyName)
+					case 2:
+						label.SetText(p.PartnerType)
+					case 3:
+						label.SetText(p.Director)
+					case 4:
+						label.SetText(p.Phone)
+					case 5:
+						label.SetText(fmt.Sprintf("%d", p.Rating))
+					case 6:
+						label.SetText(p.Email)
+					case 7:
+						label.SetText(p.Address)
+					}
 				}
 			}
 		},
@@ -108,20 +133,20 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 
 	// Настройка ширины колонок
 	table.SetColumnWidth(0, 50)  // Пустой столбец
-	table.SetColumnWidth(1, 150) // Name
-	table.SetColumnWidth(2, 100) // Type
+	table.SetColumnWidth(1, 200) // Name
+	table.SetColumnWidth(2, 200) // Type
 	table.SetColumnWidth(3, 150) // Director
 	table.SetColumnWidth(4, 120) // Phone
-	table.SetColumnWidth(5, 200) // Email
-	table.SetColumnWidth(6, 200) // Address
-	table.SetColumnWidth(7, 80)  // Rating
+	table.SetColumnWidth(5, 80)  // Rating
+	table.SetColumnWidth(6, 150) // Email
+	table.SetColumnWidth(7, 200) // Address
 
 	t.table = table
 	t.selectPartnerColumn(a)
 	t.addPartnerButton(a)
 	t.deletePartnerButton(a)
 
-	return &t, nil
+	return t, nil
 }
 
 func (t *partnerTable) addPartnerButton(a *App) {
@@ -137,8 +162,8 @@ func (t *partnerTable) addPartnerButton(a *App) {
 					dialog.ShowError(err, a.w)
 					log.Println(err)
 				}
+				t.table.Refresh()
 			}
-			t.table.Refresh()
 		})
 	})
 	t.addButton = addButton
@@ -151,14 +176,20 @@ func (t *partnerTable) deletePartnerButton(a *App) {
 			if err != nil {
 				dialog.ShowError(err, a.w)
 				log.Println(err)
+			} else {
+				t.partners, err = a.db.GetPartners()
+				if err != nil {
+					dialog.ShowError(err, a.w)
+					log.Println(err)
+				}
+				t.table.Refresh()
+				t.selectedPartnerID = 0 // Сброс выбранного партнера
+
+				// Если партнеров больше нет, выводим сообщение
+				if len(*t.partners) == 0 {
+					dialog.ShowInformation("Нет данных", "Все партнеры удалены. Добавьте нового партнера.", a.w)
+				}
 			}
-			t.partners, err = a.db.GetPartners()
-			if err != nil {
-				dialog.ShowError(err, a.w)
-				log.Println(err)
-			}
-			t.table.Refresh()
-			t.selectedPartnerID = 0 // Сброс выбранного партнера
 		} else {
 			dialog.ShowInformation("No Selection", "Please select a partner to delete", a.w)
 		}
@@ -168,31 +199,32 @@ func (t *partnerTable) deletePartnerButton(a *App) {
 
 func (t *partnerTable) selectPartnerColumn(a *App) {
 	t.table.OnSelected = func(id widget.TableCellID) {
-		if id.Row > 0 { // Кликабельна вся строка, кроме заголовков
+		if id.Row > 0 && len(*t.partners) > 0 { // Кликабельна вся строка, кроме заголовков
 			t.selectedPartnerID = (*t.partners)[id.Row-1].Id
 			p := (*t.partners)[id.Row-1]
-			showPartnerForm(a.w, p, func(updatedPartner models.Partner) {
-				err := a.db.AddPartner(updatedPartner)
-				if err != nil {
-					dialog.ShowError(err, a.w)
-				} else {
-					t.partners, err = a.db.GetPartners()
+			if id.Col != 0 {
+				showPartnerForm(a.w, p, func(updatedPartner models.Partner) {
+					err := a.db.UpdatePartner(updatedPartner) // Используем UpdatePartner вместо AddPartner
 					if err != nil {
-						log.Println(err)
+						dialog.ShowError(err, a.w)
+					} else {
+						t.partners, err = a.db.GetPartners()
+						if err != nil {
+							log.Println(err)
+						}
+						t.table.Refresh()
 					}
-					t.table.Refresh()
-				}
-			})
+				})
+			}
 		}
 	}
-
 }
 
 func showPartnerForm(w fyne.Window, p models.Partner, onSave func(models.Partner)) {
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText(p.CompanyName)
 
-	typeEntry := widget.NewSelect([]string{"Type 1", "Type 2", "Type 3"}, func(s string) {
+	typeEntry := widget.NewSelect([]string{"ООО", "ИП", "ОАО", "ПАО", "ЗАО"}, func(s string) {
 		p.PartnerType = s
 	})
 	typeEntry.SetSelected(p.PartnerType)
@@ -213,36 +245,74 @@ func showPartnerForm(w fyne.Window, p models.Partner, onSave func(models.Partner
 	ratingEntry.SetText(fmt.Sprintf("%d", p.Rating))
 
 	form := widget.NewForm(
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Type", typeEntry),
-		widget.NewFormItem("Director", directorEntry),
-		widget.NewFormItem("Phone", phoneEntry),
+		widget.NewFormItem("Название Компании", nameEntry),
+		widget.NewFormItem("Тип компании", typeEntry),
+		widget.NewFormItem("Директор", directorEntry),
+		widget.NewFormItem("Телефон", phoneEntry),
 		widget.NewFormItem("Email", emailEntry),
-		widget.NewFormItem("Address", addressEntry),
-		widget.NewFormItem("Rating", ratingEntry),
+		widget.NewFormItem("Юр. Адрес", addressEntry),
+		widget.NewFormItem("Рейтинг", ratingEntry),
 	)
 
-	form.OnSubmit = func() {
-		rating, err := strconv.Atoi(ratingEntry.Text)
-		if err != nil {
-			dialog.ShowError(fmt.Errorf("Rating must be a number"), w)
-			return
-		}
+	// Убираем кнопку Submit из формы
+	form.SubmitText = ""
+	form.OnSubmit = nil
 
-		p.CompanyName = nameEntry.Text
-		p.PartnerType = typeEntry.Selected
-		p.Director = directorEntry.Text
-		p.Phone = phoneEntry.Text
-		p.Email = emailEntry.Text
-		p.Address = addressEntry.Text
-		p.Rating = rating
-
-		onSave(p)
-	}
-
-	dialog.ShowCustomConfirm("Edit Partner", "Save", "Cancel", form, func(b bool) {
+	dialog.ShowCustomConfirm("Редактировать партнера", "Сохранить", "Отменить", form, func(b bool) {
 		if b {
-			form.OnSubmit()
+			err := validateForm(nameEntry.Text, typeEntry.Selected, directorEntry.Text, phoneEntry.Text, emailEntry.Text, addressEntry.Text, ratingEntry.Text)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			rating, _ := strconv.Atoi(ratingEntry.Text)
+			p.CompanyName = nameEntry.Text
+			p.PartnerType = typeEntry.Selected
+			p.Director = directorEntry.Text
+			p.Phone = phoneEntry.Text
+			p.Email = emailEntry.Text
+			p.Address = addressEntry.Text
+			p.Rating = rating
+
+			onSave(p)
 		}
 	}, w)
+}
+
+// validateForm проверяет все поля на корректность
+func validateForm(companyName, partnerType, director, phone, email, address, rating string) error {
+	if companyName == "" {
+		return fmt.Errorf("Название компании не может быть пустым")
+	}
+	if partnerType == "" {
+		return fmt.Errorf("Тип компании не может быть пустым")
+	}
+	if director == "" {
+		return fmt.Errorf("Имя директора не может быть пустым")
+	}
+	if phone == "" {
+		return fmt.Errorf("Телефон не может быть пустым")
+	}
+	if email == "" {
+		return fmt.Errorf("Email не может быть пустым")
+	}
+	//if !strings.Contains(email, "@") {
+	//	return fmt.Errorf("Email должен содержать символ @")
+	//}
+	if address == "" {
+		return fmt.Errorf("Юридический адрес не может быть пустым")
+	}
+	if rating == "" {
+		return fmt.Errorf("Рейтинг не может быть пустым")
+	}
+
+	ratingValue, err := strconv.Atoi(rating)
+	if err != nil {
+		return fmt.Errorf("Рейтинг должен быть числом")
+	}
+	if ratingValue < 0 {
+		return fmt.Errorf("Рейтинг должен быть положительным числом")
+	}
+
+	return nil
 }

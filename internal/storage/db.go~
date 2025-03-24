@@ -25,7 +25,7 @@ func NewDB() *DB {
 	return &DB{connect: d}
 }
 
-var getPartners = `select PartnerId, PartnerType, PartnerName, Director, Phone, Rating From Partners`
+var getPartners = `select PartnerId, PartnerType, PartnerName, Director, Phone, Rating From Partners;`
 var errPartnersNoFound = errors.New("партнеры не найдены")
 
 func (d *DB) GetPartners() (*models.Partners, error) {
@@ -56,10 +56,10 @@ func (d *DB) GetPartners() (*models.Partners, error) {
 	return &partners, nil
 }
 
-var addPartner = `insert into Partners(PartnerType, PartnerName, Director, Phone, Rating) values(?, ?, ?, ?, ?)`
+var addPartner = `insert into Partners(PartnerType, PartnerName, Director, Phone, Rating, Email, LegalAddress) values(?, ?, ?, ?, ?, ?, ?)`
 
 func (d *DB) AddPartner(partner models.Partner) error {
-	args := []any{partner.PartnerType, partner.CompanyName, partner.Director, partner.Phone, partner.Rating}
+	args := []any{partner.PartnerType, partner.CompanyName, partner.Director, partner.Phone, partner.Rating, partner.Email, partner.Address}
 	query := Query{query: addPartner, args: args}
 	_, err := d.connect.Exec(query.query, query.args...)
 	if err != nil {
@@ -72,6 +72,18 @@ var deletePartner = `delete from Partners where PartnerId = ?`
 
 func (d *DB) DeletePartner(id int) error {
 	query := Query{query: deletePartner, args: []any{id}}
+	_, err := d.connect.Exec(query.query, query.args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+var updatePartner = `update Partners set PartnerType = ?, PartnerName = ?, Director = ?, Phone = ?, Rating = ? where PartnerId = ?;`
+
+func (d *DB) UpdatePartner(partner models.Partner) error {
+	args := []any{partner.PartnerType, partner.CompanyName, partner.Director, partner.Phone, partner.Rating, partner.Id}
+	query := Query{query: updatePartner, args: args}
 	_, err := d.connect.Exec(query.query, query.args...)
 	if err != nil {
 		return err
