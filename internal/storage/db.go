@@ -26,7 +26,7 @@ func NewDB() *DB {
 }
 
 var getPartners = `select PartnerId, PartnerType, PartnerName, Director, Phone, Rating, Email, LegalAddress From Partners;`
-var errPartnersNoFound = errors.New("партнеры не найдены")
+var ErrPartnersNoFound = errors.New("партнеры не найдены")
 
 func (d *DB) GetPartners() (*models.Partners, error) {
 	query := Query{query: getPartners}
@@ -36,7 +36,7 @@ func (d *DB) GetPartners() (*models.Partners, error) {
 	}
 
 	if !rows.Next() {
-		return nil, errPartnersNoFound
+		return &models.Partners{}, ErrPartnersNoFound
 	}
 
 	partners := models.Partners{}

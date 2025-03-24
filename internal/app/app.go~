@@ -1,6 +1,7 @@
 package application
 
 import (
+	"errors"
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -46,9 +47,12 @@ func (a *App) Run() {
 	}
 
 	// Проверка на отсутствие партнеров
-	if partnersTable.partners == nil || len(*partnersTable.partners) == 0 {
+	if partnersTable.partners == nil {
 		dialog.ShowInformation("Нет данных", "Партнеры не найдены. Добавьте нового партнера.", a.w)
 	}
+	//if partnersTable.partners == nil || len(*partnersTable.partners) == 0 {
+	//	dialog.ShowInformation("Нет данных", "Партнеры не найдены. Добавьте нового партнера.", a.w)
+	//}
 
 	scrollContainer := container.NewHScroll(partnersTable.table)
 	scrollContainer.SetMinSize(fyne.NewSize(800, 400))
@@ -65,10 +69,9 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 	var err error
 
 	t.partners, err = a.db.GetPartners()
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrPartnersNoFound){
 		return t, err
 	}
-
 	// Если партнеров нет, инициализируем пустой список
 	if t.partners == nil {
 		t.partners = &models.Partners{}
@@ -76,7 +79,7 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 
 	table := widget.NewTable(
 		func() (int, int) {
-			return len(*t.partners) + 1, 6 // +1 для заголовков, 6 колонок
+			return len(*t.partners) + 1, 8 // +1 для заголовков, 6 колонок
 		},
 		func() fyne.CanvasObject {
 			return container.NewHScroll(widget.NewLabel("template"))
@@ -128,6 +131,7 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 					}
 				}
 			}
+
 		},
 	)
 
@@ -150,7 +154,7 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 }
 
 func (t *partnerTable) addPartnerButton(a *App) {
-	addButton := widget.NewButton("Add Partner", func() {
+	addButton := widget.NewButton("Добавить Партнера", func() {
 		showPartnerForm(a.w, models.Partner{}, func(newPartner models.Partner) {
 			err := a.db.AddPartner(newPartner)
 			if err != nil {
@@ -170,7 +174,7 @@ func (t *partnerTable) addPartnerButton(a *App) {
 }
 
 func (t *partnerTable) deletePartnerButton(a *App) {
-	deleteButton := widget.NewButton("Delete Partner", func() {
+	deleteButton := widget.NewButton("Удалить Партнера", func() {
 		if t.selectedPartnerID != 0 {
 			err := a.db.DeletePartner(t.selectedPartnerID)
 			if err != nil {
@@ -191,7 +195,7 @@ func (t *partnerTable) deletePartnerButton(a *App) {
 				}
 			}
 		} else {
-			dialog.ShowInformation("No Selection", "Please select a partner to delete", a.w)
+			dialog.ShowInformation("Не выбран", "Выберите партнера для удаления", a.w)
 		}
 	})
 	t.deleteButton = deleteButton
