@@ -50,17 +50,29 @@ func (a *App) Run() {
 	if partnersTable.partners == nil {
 		dialog.ShowInformation("Нет данных", "Партнеры не найдены. Добавьте нового партнера.", a.w)
 	}
-	//if partnersTable.partners == nil || len(*partnersTable.partners) == 0 {
-	//	dialog.ShowInformation("Нет данных", "Партнеры не найдены. Добавьте нового партнера.", a.w)
-	//}
 
 	scrollContainer := container.NewHScroll(partnersTable.table)
 	scrollContainer.SetMinSize(fyne.NewSize(800, 400))
+	//tabs := container.NewAppTabs(
+	//	container.NewTabItem("Партнеры", container.NewBorder(nil, container.NewHBox(partnersTable.addButton, partnersTable.deleteButton), nil, nil, scrollContainer)),
+	//)
+	// Создаем содержимое для новой вкладки (пока заглушка)
+
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Партнеры", container.NewBorder(nil, container.NewHBox(partnersTable.addButton, partnersTable.deleteButton), nil, nil, scrollContainer)),
+		container.NewTabItem("Партнеры", container.NewBorder(
+			nil,
+			container.NewHBox(partnersTable.addButton, partnersTable.deleteButton),
+			nil, nil,
+			scrollContainer,
+		)),
+		container.NewTabItem("Продажи", a.createSalesTab()),
+		container.NewTabItem("Расчет материалов", a.createMaterialsCalcTab()),
 	)
+
+	tabs.SetTabLocation(container.TabLocationTop)
+
 	a.w.SetContent(tabs)
-	a.w.Resize(fyne.NewSize(1000, 600))
+	a.w.Resize(fyne.NewSize(1200, 600))
 	a.w.ShowAndRun()
 }
 
@@ -79,7 +91,7 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 
 	table := widget.NewTable(
 		func() (int, int) {
-			return len(*t.partners) + 1, 8 // +1 для заголовков, 6 колонок
+			return len(*t.partners) + 1, 9 // +1 для заголовков, 6 колонок
 		},
 		func() fyne.CanvasObject {
 			return container.NewHScroll(widget.NewLabel("template"))
@@ -106,6 +118,8 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 					label.SetText("Почта")
 				case 7:
 					label.SetText("Юр. Адрес")
+				case 8:
+					label.SetText("Скидка")
 				}
 			} else {
 				// Данные партнеров
@@ -128,6 +142,8 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 						label.SetText(p.Email)
 					case 7:
 						label.SetText(p.Address)
+					case 8:
+						label.SetText(fmt.Sprintf("%d%%", p.Discount))
 					}
 				}
 			}
@@ -138,12 +154,13 @@ func (a *App) PartnersTable() (*partnerTable, error) {
 	// Настройка ширины колонок
 	table.SetColumnWidth(0, 50)  // Пустой столбец
 	table.SetColumnWidth(1, 200) // Name
-	table.SetColumnWidth(2, 200) // Type
+	table.SetColumnWidth(2, 120) // Type
 	table.SetColumnWidth(3, 150) // Director
 	table.SetColumnWidth(4, 120) // Phone
 	table.SetColumnWidth(5, 80)  // Rating
 	table.SetColumnWidth(6, 150) // Email
 	table.SetColumnWidth(7, 200) // Address
+	table.SetColumnWidth(8, 150)
 
 	t.table = table
 	t.selectPartnerColumn(a)

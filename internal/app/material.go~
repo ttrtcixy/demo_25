@@ -1,0 +1,180 @@
+package application
+
+import (
+	"fmt"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
+	"math"
+	"strconv"
+	"strings"
+)
+
+func (a *App) createMaterialsCalcTab() fyne.CanvasObject {
+	// Получаем данные из БД
+	products, err := a.getProducts()
+	if err != nil {
+		return widget.NewLabel("Ошибка загрузки продуктов: " + err.Error())
+	}
+
+	materialTypes, err := a.getMaterialTypes()
+	if err != nil {
+		return widget.NewLabel("Ошибка загрузки типов материалов: " + err.Error())
+	}
+
+	// Создаем элементы формы
+	productSelect := widget.NewSelect(products, nil)
+	materialSelect := widget.NewSelect(materialTypes, nil)
+	quantityEntry := widget.NewEntry()
+	param1Entry := widget.NewEntry()
+	param2Entry := widget.NewEntry()
+
+	// Настройка полей ввода
+	quantityEntry.SetPlaceHolder("Количество продукции")
+	param1Entry.SetPlaceHolder("Параметр 1")
+	param2Entry.SetPlaceHolder("Параметр 2")
+
+	// Поле для результата
+	resultLabel := widget.NewLabel("")
+	resultLabel.TextStyle.Bold = true
+
+	// Кнопка расчета
+	calculateBtn := widget.NewButton("Рассчитать", func() {
+		// Валидация ввода
+		if productSelect.Selected == "" || materialSelect.Selected == "" ||
+			quantityEntry.Text == "" || param1Entry.Text == "" || param2Entry.Text == "" {
+			resultLabel.SetText("Заполните все поля")
+			return
+		}
+
+		// Парсим введенные значения
+		quantity, err := strconv.Atoi(quantityEntry.Text)
+		if err != nil || quantity <= 0 {
+			resultLabel.SetText("Количество должно быть целым положительным числом")
+			return
+		}
+
+		param1, err := strconv.ParseFloat(param1Entry.Text, 64)
+		if err != nil || param1 <= 0 {
+			resultLabel.SetText("Параметр 1 должен быть положительным числом")
+			return
+		}
+
+		param2, err := strconv.ParseFloat(param2Entry.Text, 64)
+		if err != nil || param2 <= 0 {
+			resultLabel.SetText("Параметр 2 должен быть положительным числом")
+			return
+		}
+
+		// Получаем ID выбранных значений
+		productId := strings.Split(productSelect.Selected, " - ")[0]
+		materialId := strings.Split(materialSelect.Selected, " - ")[0]
+
+		// Вызываем метод расчета
+		requiredMaterial := a.calculateRequiredMaterial(
+			productId,
+			materialId,
+			quantity,
+			param1,
+			param2,
+		)
+
+		if requiredMaterial == -1 {
+			resultLabel.SetText("Ошибка: неверные входные данные")
+		} else {
+			resultLabel.SetText(fmt.Sprintf("Необходимо материала: %d единиц", requiredMaterial))
+		}
+	})
+
+	// Компоновка интерфейса
+	form := &widget.Form{
+		Items: []*widget.FormItem{
+			{Text: "Продукт:", Widget: productSelect},
+			{Text: "Тип материала:", Widget: materialSelect},
+			{Text: "Количество:", Widget: quantityEntry},
+			{Text: "Параметр 1:", Widget: param1Entry},
+			{Text: "Параметр 2:", Widget: param2Entry},
+		},
+	}
+
+	return container.NewVBox(
+		form,
+		calculateBtn,
+		resultLabel,
+	)
+}
+
+// Вспомогательные методы для работы с БД
+func (a *App) getProducts() ([]string, error) {
+	rows, err := a.db.Query("SELECT ProductId, ProductName FROM Products")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []string
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		products = append(products, fmt.Sprintf("%s - %s", id, name))
+	}
+
+	return products, nil
+}
+
+func (a *App) getMaterialTypes() ([]string, error) {
+	rows, err := a.db.Query("SELECT MaterialTypeId, MaterialType FROM MaterialTypes")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var materials []string
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		materials = append(materials, fmt.Sprintf("%s - %s", id, name))
+	}
+
+	return materials, nil
+}
+
+// Основной метод расчета
+func (a *App) calculateRequiredMaterial(productId, materialId string, quantity int, param1, param2 float64) int {
+	// Получаем коэффициент типа продукции
+	var productCoef float64
+	err := a.db.QueryRow(`
+        SELECT pt.Coefficient 
+        FROM ProductTypes pt
+        JOIN Products p ON pt.ProductTypeId = p.ProductTypeId
+        WHERE p.ProductId = ?`, productId).Scan(&productCoef)
+	if err != nil {
+		return -1
+	}
+
+	// Получаем процент брака материала
+	var defectPercentage float64
+	err = a.db.QueryRow(`
+        SELECT DefectPercentage 
+        FROM MaterialTypes 
+        WHERE MaterialTypeId = ?`, materialId).Scan(&defectPercentage)
+	if err != nil {
+		return -1
+	}
+
+	// Расчет необходимого количества материала
+	materialPerUnit := param1 * param2 * productCoef
+	totalMaterial := float64(quantity) * materialPerUnit
+
+	// Учет брака материала
+	if defectPercentage > 0 {
+		totalMaterial = totalMaterial * (1 + defectPercentage/100)
+	}
+
+	// Округляем вверх до целого числа
+	return int(math.Ceil(totalMaterial))
+}

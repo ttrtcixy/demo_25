@@ -11,6 +11,8 @@ type Partner struct {
 
 	Email   string
 	Address string
+
+	Discount int
 }
 
 type Partners []Partner

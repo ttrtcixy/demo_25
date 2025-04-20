@@ -1,0 +1,9 @@
+package models
+
+type PartnerSale struct {
+	ProductName string  `db:"Продукция"`
+	Quantity    int     `db:"Количество"`
+	SaleDate    string  `db:"Дата продажи"`
+	ProductType string  `db:"Тип продукции"`
+	TotalSum    float64 `db:"Общая сумма"`
+}
