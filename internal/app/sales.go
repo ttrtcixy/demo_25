@@ -9,334 +9,14 @@ import (
 	"strings"
 )
 
-//func (a *App) createSalesTab() fyne.CanvasObject {
-//	// Элементы формы
-//	searchEntry := widget.NewEntry()
-//	searchEntry.SetPlaceHolder("Введите ID или имя партнера")
-//	searchEntry.Resize(fyne.NewSize(300, 0))
-//
-//	searchResultLabel := widget.NewLabel("")
-//	//table := widget.NewTable(
-//	//	func() (int, int) { return 0, 0 },
-//	//	func() fyne.CanvasObject { return widget.NewLabel("") },
-//	//	func(i widget.TableCellID, o fyne.CanvasObject) {},
-//	//)
-//
-//	// Добавьте в начало createSalesTab()
-//	//headers := []string{"Продукция", "Количество", "Дата продажи", "Тип продукции", "Сумма"}
-//
-//	// Модифицируйте создание таблицы
-//	//table := widget.NewTable(
-//	//	func() (int, int) { return 0, len(headers) },
-//	//	func() fyne.CanvasObject { return widget.NewLabel("") },
-//	//	func(i widget.TableCellID, o fyne.CanvasObject) {
-//	//		label := o.(*widget.Label)
-//	//		if i.Row == -1 { // Заголовки
-//	//			label.SetText(headers[i.Col])
-//	//			label.TextStyle.Bold = true
-//	//		}
-//	//	},
-//	//)
-//	table := widget.NewTable(
-//		func() (int, int) {
-//			return 0, 6 // Будем обновлять при загрузке данных
-//		},
-//		func() fyne.CanvasObject {
-//			return container.NewHScroll(widget.NewLabel("template"))
-//		},
-//		func(i widget.TableCellID, o fyne.CanvasObject) {
-//			scrollContainer := o.(*container.Scroll)
-//			label := scrollContainer.Content.(*widget.Label)
-//
-//			if i.Row == 0 {
-//				// Заголовки столбцов
-//				switch i.Col {
-//				case 0:
-//					label.SetText("Продукция")
-//				case 1:
-//					label.SetText("Количество")
-//				case 2:
-//					label.SetText("Дата продажи")
-//				case 3:
-//					label.SetText("Тип продукции")
-//				case 4:
-//					label.SetText("Сумма")
-//				case 5:
-//					label.SetText("Прибыль")
-//				}
-//				label.TextStyle.Bold = true
-//			} else {
-//				// Данные будут заполняться при поиске
-//				label.SetText("")
-//			}
-//		},
-//	)
-//
-//	// Кнопка поиска
-//	searchBtn := widget.NewButton("Найти", func() {
-//		searchTerm := strings.TrimSpace(searchEntry.Text)
-//		if searchTerm == "" {
-//			dialog.ShowInformation("Ошибка", "Введите ID или имя партнера", a.w)
-//			return
-//		}
-//
-//		partnerID, partnerName, err := a.db.FindPartner(searchTerm)
-//		if err != nil {
-//			dialog.ShowInformation("Не найдено", err.Error(), a.w)
-//			return
-//		}
-//
-//		searchResultLabel.SetText(fmt.Sprintf("Партнер: %s (ID: %d)", partnerName, partnerID))
-//
-//		sales, err := a.db.GetPartnerSales(partnerID)
-//		if err != nil {
-//			dialog.ShowError(err, a.w)
-//			return
-//		}
-//
-//		// Обновляем таблицу
-//		//table.Length = func() (int, int) {
-//		//	return len(sales), 5
-//		//}
-//		//table.CreateCell = func() fyne.CanvasObject {
-//		//	return widget.NewLabel("")
-//		//}
-//
-//		table.Length = func() (int, int) {
-//			return len(sales) + 1, 6 // +1 для заголовков
-//		}
-//		//table.UpdateCell = func(i widget.TableCellID, o fyne.CanvasObject) {
-//		//	label := o.(*widget.Label)
-//		//	switch i.Col {
-//		//	case 0:
-//		//		label.SetText(sales[i.Row].ProductName)
-//		//	case 1:
-//		//		label.SetText(fmt.Sprintf("%d", sales[i.Row].Quantity))
-//		//	case 2:
-//		//		label.SetText(sales[i.Row].SaleDate)
-//		//	case 3:
-//		//		label.SetText(sales[i.Row].ProductType)
-//		//	case 4:
-//		//		label.SetText(fmt.Sprintf("%.2f ₽", sales[i.Row].TotalSum))
-//		//	}
-//		//}
-//		table.UpdateCell = func(i widget.TableCellID, o fyne.CanvasObject) {
-//			scrollContainer := o.(*container.Scroll)
-//			label := scrollContainer.Content.(*widget.Label)
-//
-//			if i.Row == 0 {
-//				// Заголовки уже установлены при создании
-//				return
-//			}
-//
-//			if i.Row-1 < len(sales) {
-//				sale := sales[i.Row-1]
-//				switch i.Col {
-//				case 0:
-//					label.SetText(sale.ProductName)
-//				case 1:
-//					label.SetText(fmt.Sprintf("%d", sale.Quantity))
-//				case 2:
-//					label.SetText(sale.SaleDate)
-//				case 3:
-//					label.SetText(sale.ProductType)
-//				case 4:
-//					label.SetText(fmt.Sprintf("%.2f ₽", sale.TotalSum))
-//				case 5:
-//					// Пример расчета прибыли (можно адаптировать)
-//					profit := sale.TotalSum * 0.2 // 20% прибыли
-//					label.SetText(fmt.Sprintf("%.2f ₽", profit))
-//				}
-//			}
-//		}
-//		table.Refresh()
-//	})
-//
-//	table.SetColumnWidth(0, 200)
-//	table.SetColumnWidth(1, 200)
-//	table.SetColumnWidth(2, 200)
-//	table.SetColumnWidth(3, 200)
-//	table.SetColumnWidth(4, 200)
-//
-//	// Компоновка элементов
-//	searchForm := container.NewVBox(
-//		container.NewHBox(
-//			searchEntry,
-//			searchBtn,
-//		),
-//		searchResultLabel,
-//		widget.NewSeparator(),
-//	)
-//
-//	tableScroll := container.NewScroll(table)
-//	tableScroll.SetMinSize(fyne.NewSize(800, 400))
-//
-//	return container.NewBorder(
-//		searchForm,
-//		nil,
-//		nil,
-//		nil,
-//		tableScroll,
-//	)
-//}
-
-//func (a *App) createSalesTab() fyne.CanvasObject {
-//	// Элементы интерфейса
-//	searchEntry := widget.NewEntry()
-//	searchEntry.SetPlaceHolder("Введите ID партнера или часть имени")
-//
-//	resultLabel := widget.NewLabel("")
-//	resultLabel.Wrapping = fyne.TextWrapWord
-//
-//	// Создаем таблицу в вашем стиле
-//	table := widget.NewTable(
-//		func() (int, int) {
-//			return 0, 6 // Будем обновлять при загрузке данных
-//		},
-//		func() fyne.CanvasObject {
-//			return container.NewHScroll(widget.NewLabel("template"))
-//		},
-//		func(i widget.TableCellID, o fyne.CanvasObject) {
-//			scrollContainer := o.(*container.Scroll)
-//			label := scrollContainer.Content.(*widget.Label)
-//
-//			if i.Row == 0 {
-//				// Заголовки столбцов
-//				switch i.Col {
-//				case 0:
-//					label.SetText("Продукция")
-//				case 1:
-//					label.SetText("Количество")
-//				case 2:
-//					label.SetText("Дата продажи")
-//				case 3:
-//					label.SetText("Тип продукции")
-//				case 4:
-//					label.SetText("Сумма")
-//				case 5:
-//					label.SetText("Прибыль")
-//				}
-//				label.TextStyle.Bold = true
-//			} else {
-//				// Данные будут заполняться при поиске
-//				label.SetText("")
-//			}
-//		},
-//	)
-//
-//	// Настройка ширины колонок
-//	table.SetColumnWidth(0, 200) // Продукция
-//	table.SetColumnWidth(1, 100) // Количество
-//	table.SetColumnWidth(2, 120) // Дата продажи
-//	table.SetColumnWidth(3, 150) // Тип продукции
-//	table.SetColumnWidth(4, 120) // Сумма
-//	table.SetColumnWidth(5, 120) // Прибыль
-//
-//	// Функция поиска и отображения данных
-//	searchAndDisplay := func() {
-//		searchTerm := strings.TrimSpace(searchEntry.Text)
-//		if searchTerm == "" {
-//			dialog.ShowInformation("Ошибка", "Введите ID или имя партнера", a.w)
-//			return
-//		}
-//		// Ищем партнера
-//		var partnerID int
-//		var partnerName string
-//
-//		partnerID, partnerName, err := a.db.FindPartner(searchTerm)
-//		if err != nil {
-//			dialog.ShowInformation("Не найдено", "Партнер не найден", a.w)
-//			return
-//		}
-//
-//		resultLabel.SetText(fmt.Sprintf("Продажи партнера: %s (ID: %d)", partnerName, partnerID))
-//
-//		// Получаем данные о продажах
-//		sales, err := a.db.GetPartnerSales(partnerID)
-//		if err != nil {
-//			dialog.ShowError(fmt.Errorf("ошибка получения продаж: %v", err), a.w)
-//			return
-//		}
-//
-//		// Обновляем таблицу
-//		table.Length = func() (int, int) {
-//			return len(sales) + 1, 6 // +1 для заголовков
-//		}
-//		table.UpdateCell = func(i widget.TableCellID, o fyne.CanvasObject) {
-//			scrollContainer := o.(*container.Scroll)
-//			label := scrollContainer.Content.(*widget.Label)
-//
-//			if i.Row == 0 {
-//				// Заголовки уже установлены при создании
-//				return
-//			}
-//
-//			if i.Row-1 < len(sales) {
-//				sale := sales[i.Row-1]
-//				switch i.Col {
-//				case 0:
-//					label.SetText(sale.ProductName)
-//				case 1:
-//					label.SetText(fmt.Sprintf("%d", sale.Quantity))
-//				case 2:
-//					label.SetText(sale.SaleDate)
-//				case 3:
-//					label.SetText(sale.ProductType)
-//				case 4:
-//					label.SetText(fmt.Sprintf("%.2f ₽", sale.TotalSum))
-//				case 5:
-//					// Пример расчета прибыли (можно адаптировать)
-//					profit := sale.TotalSum * 0.2 // 20% прибыли
-//					label.SetText(fmt.Sprintf("%.2f ₽", profit))
-//				}
-//			}
-//		}
-//		table.Refresh()
-//	}
-//
-//	// Кнопка поиска
-//	searchBtn := widget.NewButton("Поиск", searchAndDisplay)
-//	searchBtn.Importance = widget.HighImportance
-//	searchEntry.OnSubmitted = func(_ string) { searchAndDisplay() }
-//
-//	// Компоновка интерфейса
-//	searchBox := container.NewHBox(
-//		widget.NewLabel("Поиск:"),
-//		searchEntry,
-//		searchBtn,
-//	)
-//
-//	topPanel := container.NewVBox(
-//		searchBox,
-//		resultLabel,
-//		widget.NewSeparator(),
-//	)
-//
-//	tableContainer := container.NewBorder(
-//		nil, nil, nil, nil,
-//		container.NewScroll(table),
-//	)
-//	tableContainer.Resize(fyne.NewSize(900, 500))
-//
-//	return container.NewBorder(
-//		topPanel,
-//		nil,
-//		nil,
-//		nil,
-//		tableContainer,
-//	)
-//}
-
 func (a *App) createSalesTab() fyne.CanvasObject {
-	// Элементы интерфейса
 	searchEntry := widget.NewEntry()
 	searchEntry.SetPlaceHolder("Введите ID партнера или часть имени")
-	searchEntry.Resize(fyne.NewSize(400, searchEntry.MinSize().Height)) // Увеличиваем ширину поля поиска
+	searchEntry.Resize(fyne.NewSize(400, searchEntry.MinSize().Height))
 
 	resultLabel := widget.NewLabel("")
 	resultLabel.Wrapping = fyne.TextWrapWord
 
-	// Создаем таблицу
 	table := widget.NewTable(
 		func() (int, int) {
 			return 1, 6 // Начинаем с 1 строки (заголовки)
@@ -351,7 +31,6 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 			label := scrollContainer.Content.(*widget.Label)
 
 			if i.Row == 0 {
-				// Заголовки столбцов
 				switch i.Col {
 				case 0:
 					label.SetText("Продукция")
@@ -368,13 +47,12 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 				}
 				label.TextStyle.Bold = true
 			} else {
-				// Пустые данные по умолчанию
+
 				label.SetText("")
 			}
 		},
 	)
 
-	// Настройка ширины колонок
 	table.SetColumnWidth(0, 200)
 	table.SetColumnWidth(1, 100)
 	table.SetColumnWidth(2, 120)
@@ -382,7 +60,6 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 	table.SetColumnWidth(4, 120)
 	table.SetColumnWidth(5, 120)
 
-	// Функция поиска и отображения данных
 	searchAndDisplay := func() {
 		searchTerm := strings.TrimSpace(searchEntry.Text)
 		if searchTerm == "" {
@@ -390,7 +67,6 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 			return
 		}
 
-		// Ищем партнера
 		partnerID, partnerName, err := a.db.FindPartner(searchTerm)
 		if err != nil {
 			dialog.ShowInformation("Не найдено", "Партнер не найден", a.w)
@@ -399,14 +75,12 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 
 		resultLabel.SetText(fmt.Sprintf("Продажи партнера: %s (ID: %d)", partnerName, partnerID))
 
-		// Получаем данные о продажах
 		sales, err := a.db.GetPartnerSales(partnerID)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("ошибка получения продаж: %v", err), a.w)
 			return
 		}
 
-		// Обновляем таблицу
 		table.Length = func() (int, int) {
 			return len(sales) + 1, 6 // +1 для заголовков
 		}
@@ -441,12 +115,10 @@ func (a *App) createSalesTab() fyne.CanvasObject {
 		table.Refresh()
 	}
 
-	// Кнопка поиска
 	searchBtn := widget.NewButton("Поиск", searchAndDisplay)
 	searchBtn.Importance = widget.HighImportance
 	searchEntry.OnSubmitted = func(_ string) { searchAndDisplay() }
 
-	// Компоновка интерфейса с увеличенным полем поиска
 	searchBox := container.NewBorder(
 		nil, nil,
 		widget.NewLabel("Поиск:"),

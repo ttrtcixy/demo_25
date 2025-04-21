@@ -28,7 +28,6 @@ func NewDB() *DB {
 	return &DB{connect: d}
 }
 
-// var getPartners = `select PartnerId, PartnerType, PartnerName, Director, Phone, Rating, Email, LegalAddress From Partners;`
 var getPartners = `SELECT 
    p.PartnerId, p.PartnerType, p.PartnerName, p.Director, p.Phone, p.Rating, p.Email, p.LegalAddress,
     CASE
@@ -46,9 +45,9 @@ GROUP BY
 
 var ErrPartnersNoFound = errors.New("партнеры не найдены")
 
-func (d *DB) GetPartners() (*models.Partners, error) {
+func (db *DB) GetPartners() (*models.Partners, error) {
 	query := Query{query: getPartners}
-	rows, err := d.connect.Query(query.query)
+	rows, err := db.connect.Query(query.query)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +75,10 @@ func (d *DB) GetPartners() (*models.Partners, error) {
 
 var addPartner = `insert into Partners(PartnerType, PartnerName, Director, Phone, Rating, Email, LegalAddress) values(?, ?, ?, ?, ?, ?, ?)`
 
-func (d *DB) AddPartner(partner models.Partner) error {
+func (db *DB) AddPartner(partner models.Partner) error {
 	args := []any{partner.PartnerType, partner.CompanyName, partner.Director, partner.Phone, partner.Rating, partner.Email, partner.Address}
 	query := Query{query: addPartner, args: args}
-	_, err := d.connect.Exec(query.query, query.args...)
+	_, err := db.connect.Exec(query.query, query.args...)
 	if err != nil {
 		return err
 	}
@@ -88,9 +87,9 @@ func (d *DB) AddPartner(partner models.Partner) error {
 
 var deletePartner = `delete from Partners where PartnerId = ?`
 
-func (d *DB) DeletePartner(id int) error {
+func (db *DB) DeletePartner(id int) error {
 	query := Query{query: deletePartner, args: []any{id}}
-	_, err := d.connect.Exec(query.query, query.args...)
+	_, err := db.connect.Exec(query.query, query.args...)
 	if err != nil {
 		return err
 	}
@@ -99,10 +98,10 @@ func (d *DB) DeletePartner(id int) error {
 
 var updatePartner = `update Partners set PartnerType = ?, PartnerName = ?, Director = ?, Phone = ?, Rating = ? where PartnerId = ?;`
 
-func (d *DB) UpdatePartner(partner models.Partner) error {
+func (db *DB) UpdatePartner(partner models.Partner) error {
 	args := []any{partner.PartnerType, partner.CompanyName, partner.Director, partner.Phone, partner.Rating, partner.Id}
 	query := Query{query: updatePartner, args: args}
-	_, err := d.connect.Exec(query.query, query.args...)
+	_, err := db.connect.Exec(query.query, query.args...)
 	if err != nil {
 		return err
 	}
@@ -127,27 +126,9 @@ var getPartnerSales = `
     ORDER BY 
         pp.SaleDate DESC`
 
-func (d *DB) GetPartnerSales(id int) ([]models.PartnerSale, error) {
-	query := `
-    SELECT 
-        p.ProductName AS 'Продукция',
-        pp.Quantity AS 'Количество',
-        pp.SaleDate AS 'Дата продажи',
-        pt.ProductType AS 'Тип продукции',
-        (pp.Quantity * p.MinCost) AS 'Общая сумма'
-    FROM 
-        PartnerProducts pp
-    JOIN 
-        Products p ON pp.ProductId = p.ProductId
-    JOIN 
-        ProductTypes pt ON p.ProductTypeId = pt.ProductTypeId
-    WHERE 
-        pp.PartnerId = ?
-    ORDER BY 
-        pp.SaleDate DESC`
-
+func (db *DB) GetPartnerSales(id int) ([]models.PartnerSale, error) {
 	var sales []models.PartnerSale
-	rows, err := d.connect.Query(query, id)
+	rows, err := db.connect.Query(getPartnerSales, id)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка выполнения запроса продаж: %v", err)
 	}
@@ -155,7 +136,7 @@ func (d *DB) GetPartnerSales(id int) ([]models.PartnerSale, error) {
 
 	for rows.Next() {
 		var sale models.PartnerSale
-		var rawDate interface{} // Принимаем дату как интерфейс
+		var rawDate interface{}
 
 		err := rows.Scan(
 			&sale.ProductName,
@@ -168,7 +149,6 @@ func (d *DB) GetPartnerSales(id int) ([]models.PartnerSale, error) {
 			return nil, fmt.Errorf("ошибка сканирования строки: %v", err)
 		}
 
-		// Преобразуем дату в строку
 		switch v := rawDate.(type) {
 		case time.Time:
 			sale.SaleDate = v.Format("2006-01-02")
@@ -189,18 +169,16 @@ func (d *DB) GetPartnerSales(id int) ([]models.PartnerSale, error) {
 	return sales, nil
 }
 
-func (d *DB) FindPartner(searchTerm string) (int, string, error) {
+func (db *DB) FindPartner(searchTerm string) (int, string, error) {
 	var partnerID int
 	var partnerName string
 
-	// Пробуем найти по ID
-	err := d.connect.QueryRow("SELECT PartnerId, PartnerName FROM Partners WHERE PartnerId = ?", searchTerm).Scan(&partnerID, &partnerName)
+	err := db.connect.QueryRow("SELECT PartnerId, PartnerName FROM Partners WHERE PartnerId = ?", searchTerm).Scan(&partnerID, &partnerName)
 	if err == nil {
 		return partnerID, partnerName, nil
 	}
 
-	// Если не нашли по ID, ищем по имени
-	err = d.connect.QueryRow("SELECT PartnerId, PartnerName FROM Partners WHERE PartnerName LIKE ? LIMIT 1", "%"+searchTerm+"%").Scan(&partnerID, &partnerName)
+	err = db.connect.QueryRow("SELECT PartnerId, PartnerName FROM Partners WHERE PartnerName LIKE ? LIMIT 1", "%"+searchTerm+"%").Scan(&partnerID, &partnerName)
 	if err != nil {
 		return 0, "", fmt.Errorf("партнер не найден")
 	}
@@ -245,7 +223,7 @@ func (db *DB) GetMaterialTypes() ([]string, error) {
 }
 
 func (db *DB) CalculateMaterial(productId, materialId string, quantity int, param1, param2 float64) (int, error) {
-	// Получаем коэффициент продукта
+
 	var productCoef float64
 	err := db.connect.QueryRow(`
         SELECT pt.Coefficient 
@@ -256,7 +234,6 @@ func (db *DB) CalculateMaterial(productId, materialId string, quantity int, para
 		return -1, fmt.Errorf("не найден коэффициент для продукта")
 	}
 
-	// Получаем процент брака
 	var defectPercentage float64
 	err = db.connect.QueryRow(`
         SELECT DefectPercentage 
@@ -266,7 +243,6 @@ func (db *DB) CalculateMaterial(productId, materialId string, quantity int, para
 		return -1, fmt.Errorf("не найден процент брака для материала")
 	}
 
-	// Расчет
 	materialPerUnit := param1 * param2 * productCoef
 	totalMaterial := float64(quantity) * materialPerUnit
 	if defectPercentage > 0 {
